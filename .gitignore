@@ -1,0 +1,10 @@
+venv/
+runs/
+__pycache__/
+*.pt
+WISP-FLOW_Dataset_*
+.env
+scans.db
+saved_images/
+backups/
+server.log

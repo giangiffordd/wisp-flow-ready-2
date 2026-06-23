@@ -1,0 +1,17 @@
+fastapi==0.115.0
+python-dotenv==1.0.1
+uvicorn[standard]==0.30.0
+python-multipart==0.0.9
+torch==2.5.1
+torchvision==0.20.1
+ultralytics==8.4.56
+opencv-python-headless==4.13.0.92
+Pillow==12.2.0
+numpy==2.4.4
+requests==2.34.2
+pi-heif==1.4.0
+zxing-cpp==2.3.0
+slowapi==0.1.10
+qrcode==8.0
+pyzbar==0.1.9
+# pyzbar needs the system zbar library: `apt install libzbar0` on Debian/Ubuntu droplets.
