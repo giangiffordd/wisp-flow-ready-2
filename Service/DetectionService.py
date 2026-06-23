@@ -93,9 +93,17 @@ class DetectionService:
 
         height, width = frame.shape[:2]
         annotated = frame.copy()
-        yolo_results = self.model.predict(frame, conf=0.25)
+        # Must match test.py's QA station threshold (conf=0.5) -- a lower
+        # threshold here let spurious low-confidence detections through that
+        # test.py would discard, which could get labeled as the "primary"
+        # specimen and look like a wrong species with mismatched boxes.
+        yolo_results = self.model.predict(frame, conf=0.5)
 
         insects, parts, raw_detections = self._parse_detections(yolo_results, width, height)
+        # Highest-confidence insect first -- the client always treats
+        # specimens[0] as "the" detected specimen, so this must be the
+        # model's best guess, not whatever order YOLO happened to return.
+        insects.sort(key=lambda i: i["confidence"], reverse=True)
         self._annotate_frame(annotated, insects, parts, width)
         specimens = self._build_specimens(insects, parts, width, height, annotated)
 
