@@ -3,8 +3,9 @@
 # most recent scans.db backup (see backup.sh). Stops the running uvicorn
 # process, checks out the target commit, restores the DB, then restarts.
 #
-# Usage: scripts/rollback.sh <git-ref> [--yes]
-#   <git-ref>  commit hash, tag, or relative ref (e.g. HEAD~1)
+# Usage: scripts/rollback.sh [git-ref] [--yes]
+#   [git-ref]  commit hash, tag, or relative ref (default: HEAD~1, i.e. the
+#              commit before whatever is currently deployed)
 #   --yes      skip the confirmation prompt (for non-interactive use)
 set -euo pipefail
 
@@ -13,16 +14,9 @@ BACKUP_DIR="${WISP_BACKUP_DIR:-$APP_DIR/backups}"
 LOG_FILE="$APP_DIR/server.log"
 PORT="${WISP_PORT:-8000}"
 
-TARGET="${1:-}"
+TARGET="${1:-HEAD~1}"
 AUTO_YES=false
 [ "${2:-}" = "--yes" ] && AUTO_YES=true
-
-if [ -z "$TARGET" ]; then
-    echo "Usage: $0 <git-ref> [--yes]" >&2
-    echo "Example: $0 HEAD~1" >&2
-    echo "         $0 abc1234 --yes" >&2
-    exit 1
-fi
 
 cd "$APP_DIR"
 
@@ -44,7 +38,11 @@ if [ "$AUTO_YES" != true ]; then
 fi
 
 echo "[rollback] stopping server on port $PORT..."
-pkill -f "python.*main\.py" 2>/dev/null || true
+if command -v fuser >/dev/null 2>&1; then
+    fuser -k "${PORT}/tcp" 2>/dev/null && echo "[rollback] server stopped." || echo "[rollback] no server was listening on $PORT."
+else
+    pkill -f "python.*main\.py" 2>/dev/null || true
+fi
 sleep 1
 if pgrep -f "python.*main\.py" >/dev/null 2>&1; then
     echo "[rollback] process still alive, sending SIGKILL..."
