@@ -1,9 +1,11 @@
 import os
 import glob
+import io
 import base64
 import cv2
 import numpy as np
 from typing import Optional
+from PIL import Image, ImageOps
 from ultralytics import YOLO
 
 from Service.QAService import (
@@ -60,9 +62,24 @@ class DetectionService:
     def is_ready(self) -> bool:
         return self.model is not None
 
+    @staticmethod
+    def _decode_image(image_bytes: bytes) -> Optional[np.ndarray]:
+        """Decode upload bytes into a BGR frame, honoring EXIF orientation.
+        Phone cameras (e.g. Expo's takePictureAsync with skipProcessing:true)
+        ship the raw sensor frame plus an EXIF rotation tag instead of
+        physically rotating the pixels. cv2.imdecode ignores EXIF entirely,
+        so without this the model sees sideways/upside-down insects from
+        phone uploads even though webcam captures (no EXIF) look fine."""
+        try:
+            pil_image = Image.open(io.BytesIO(image_bytes))
+            pil_image = ImageOps.exif_transpose(pil_image)
+            pil_image = pil_image.convert("RGB")
+        except Exception:
+            return None
+        return cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+
     def run_detection(self, image_bytes: bytes) -> dict:
-        np_arr = np.frombuffer(image_bytes, np.uint8)
-        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        frame = self._decode_image(image_bytes)
         if frame is None:
             raise ValueError("Invalid image file")
 
