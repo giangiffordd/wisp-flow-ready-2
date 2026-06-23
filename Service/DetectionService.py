@@ -1,4 +1,5 @@
 import os
+import glob
 import base64
 import cv2
 import numpy as np
@@ -14,8 +15,21 @@ from Service.ImageService import (
 )
 from config import BLUR_THRESHOLD, SCORE_WIDTH
 
-# Only checkpoint that actually exists on disk for this project copy.
-MODEL_PATH: str = os.path.join("runs", "detect", "train-2", "weights", "best.pt")
+
+def _resolve_model_path() -> str:
+    """Find the trained weights checkpoint. The training run number (train-2,
+    train-7, ...) differs between machines, so prefer an explicit override
+    and otherwise pick the most recently modified checkpoint on disk."""
+    override = os.environ.get("WISP_MODEL_PATH")
+    if override:
+        return override
+    candidates = glob.glob(os.path.join("runs", "detect", "train*", "weights", "best.pt"))
+    if candidates:
+        return max(candidates, key=os.path.getmtime)
+    return os.path.join("runs", "detect", "train-2", "weights", "best.pt")
+
+
+MODEL_PATH: str = _resolve_model_path()
 
 
 def sharpness_score(frame: np.ndarray) -> float:
