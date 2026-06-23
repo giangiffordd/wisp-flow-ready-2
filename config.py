@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 try:
     from dotenv import load_dotenv
@@ -6,7 +7,12 @@ try:
 except ImportError:
     pass
 
-API_KEY: str = os.environ.get("WISP_API_KEY", "wf-K9mP3qR7nL2xZ8vB4j")
+# No hardcoded fallback: a leaked default here would be a live credential
+# sitting in a public repo. Falls back to None (not "") so an attacker
+# sending an empty X-API-Key header -- a real string, never None -- can
+# never match by accident; missing WISP_API_KEY means every request is
+# rejected (fail closed) rather than silently falling back to a known value.
+API_KEY: Optional[str] = os.environ.get("WISP_API_KEY")
 
 MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024  # 10 MB
 
