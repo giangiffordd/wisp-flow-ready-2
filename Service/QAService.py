@@ -75,14 +75,24 @@ def _matches_pose(found_parts: Dict[str, int], pose: Dict[str, int]) -> bool:
 def apply_qa_routing(
     species_name: str,
     found_parts: Dict[str, int],
-) -> Tuple[str, QARule]:
+) -> Tuple[str, Dict[str, int]]:
     rules = QA_RULES.get(species_name)
     if rules is None:
         return 'FLAGGED', {}
     if isinstance(rules, list):
         is_pass = any(_matches_pose(found_parts, pose) for pose in rules)
-    else:
-        is_pass = _matches_pose(found_parts, rules)
+        # Resolve to a single pose before returning -- callers (and the API
+        # response's parts_required) expect a flat {part: count} dict, not
+        # the internal multi-pose list. Report whichever pose's counts are
+        # closest to what was actually found, so a flagged dual-pose
+        # specimen shows specific missing parts instead of an ambiguous
+        # "required" set the client can't sensibly render.
+        closest_pose = min(
+            rules,
+            key=lambda pose: sum(abs(found_parts.get(part, 0) - count) for part, count in pose.items())
+        )
+        return ('PASS' if is_pass else 'FLAGGED'), closest_pose
+    is_pass = _matches_pose(found_parts, rules)
     return ('PASS' if is_pass else 'FLAGGED'), rules
 
 
