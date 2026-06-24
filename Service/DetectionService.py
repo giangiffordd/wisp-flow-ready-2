@@ -33,6 +33,14 @@ def _resolve_model_path() -> str:
 
 MODEL_PATH: str = _resolve_model_path()
 
+# A real specimen photographed during a QA scan never fills almost the
+# entire frame. A box spanning nearly edge-to-edge is a known failure mode
+# when the model is shown a blank/textured background with nothing genuine
+# to detect (e.g. a wall) -- it can still report this with high confidence,
+# so the confidence score alone won't catch it. This is a plausibility
+# guardrail, not a model fix.
+MAX_INSECT_BOX_AREA_RATIO = 0.85
+
 
 def sharpness_score(frame: np.ndarray) -> float:
     """Laplacian-variance blur score, computed on a resized copy so it stays
@@ -120,6 +128,13 @@ class DetectionService:
             "annotated_image_base64": b64_image,
         }
 
+    @staticmethod
+    def _is_plausible_insect_box(coords: list, width: int, height: int) -> bool:
+        x1, y1, x2, y2 = coords
+        box_area = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+        frame_area = width * height
+        return frame_area > 0 and (box_area / frame_area) <= MAX_INSECT_BOX_AREA_RATIO
+
     def _parse_detections(self, yolo_results, width: int, height: int) -> tuple:
         insects, parts, raw_detections = [], [], []
         for result in yolo_results:
@@ -142,7 +157,8 @@ class DetectionService:
                 })
 
                 if cls_name in PARENT_SPECIES:
-                    insects.append({"species": cls_name, "confidence": conf, "coords": [x1, y1, x2, y2]})
+                    if self._is_plausible_insect_box([x1, y1, x2, y2], width, height):
+                        insects.append({"species": cls_name, "confidence": conf, "coords": [x1, y1, x2, y2]})
                 elif cls_name in PART_CLASSES:
                     parts.append({"name": cls_name, "confidence": conf, "coords": [x1, y1, x2, y2]})
                 # Anything matching neither list (e.g. graphium_weiskei) is
